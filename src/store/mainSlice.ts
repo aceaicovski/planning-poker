@@ -51,7 +51,6 @@ const mainSlice = createSlice({
   },
 });
 
-export const { setName, joinRoom, updateParticipants, vote, resetVotes, addOrUpdateParticipant } =
-  mainSlice.actions;
+export const mainSliceActions = mainSlice.actions;
 
 export default mainSlice.reducer;
