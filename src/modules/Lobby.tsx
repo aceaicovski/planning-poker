@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { v4 as uuidv4 } from "uuid";
-import { useStoreActions } from "../store/hooks/useStoreActions";
+import { useStoreActions } from "@/store/hooks/useStoreActions.ts";
 
 const Lobby = () => {
   const [nameInput, setNameInput] = useState("");
   const [roomIdInput, setRoomIdInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const { setName, joinRoom } = useStoreActions();
+  const { setName, setRoomId } = useStoreActions();
   const navigate = useNavigate();
 
   const handleCreateRoom = async () => {
@@ -24,7 +24,7 @@ const Lobby = () => {
 
       // Update Redux state
       setName(nameInput.trim());
-      joinRoom(newRoomId);
+      setRoomId(newRoomId);
 
       // Navigate to room with URL params
       navigate(`/room/${newRoomId}?name=${encodeURIComponent(nameInput.trim())}`);
@@ -54,7 +54,7 @@ const Lobby = () => {
 
       // Update Redux state
       setName(nameInput.trim());
-      joinRoom(roomId);
+      setRoomId(roomId);
 
       // Navigate to room with URL params
       navigate(`/room/${roomId}?name=${encodeURIComponent(nameInput.trim())}`);
@@ -134,7 +134,7 @@ const Lobby = () => {
               type="text"
               value={roomIdInput}
               onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
-              onKeyPress={(e) => handleKeyPress(e, "join")}
+              onKeyDown={(e) => handleKeyPress(e, "join")}
               placeholder="Enter Room ID"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
               disabled={isLoading}

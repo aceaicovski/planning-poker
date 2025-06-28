@@ -6,17 +6,15 @@ import NotFound from "./components/NotFound.tsx";
 function App() {
   return (
     <BrowserRouter>
-      <div className="App">
-        <Routes>
-          <Route path="/" element={<Lobby />} />
+      <Routes>
+        <Route path="/" element={<Lobby />} />
 
-          <Route path="/room/:roomId" element={<Room />} />
+        <Route path="/room/:roomId" element={<Room />} />
 
-          <Route path="/lobby" element={<Navigate to="/" replace />} />
+        <Route path="/lobby" element={<Navigate to="/" replace />} />
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </BrowserRouter>
   );
 }
