@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import { useSocket } from "@/hooks/useSocket";
 import { useStoreState } from "@/store/hooks/useStoreState";
 

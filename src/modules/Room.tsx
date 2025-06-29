@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "@/hooks/useSocket";
 import { useStoreState } from "@/store/hooks/useStoreState";
 
@@ -8,10 +8,10 @@ const CARD_VALUES = ["1", "2", "3", "5", "8", "13", "?", "☕"];
 const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  
+
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
-  
-  const { vote, revealVotes, resetVotes, getRoomState } = useSocket();
+
+  const { vote, revealVotes, resetVotes, getRoomState, initializeConnection } = useSocket();
   const { currentRoom, userId, userName, isConnected } = useStoreState((state) => state.poker);
 
   useEffect(() => {
@@ -19,18 +19,26 @@ const Room = () => {
       navigate("/");
       return;
     }
-    
-    if (isConnected && roomId) {
-      getRoomState().catch((error) => {
-        console.error("Failed to get room state:", error);
+
+    // If user navigated directly to room URL, we need to connect first
+    const connectAndGetState = async () => {
+      try {
+        if (!isConnected) {
+          await initializeConnection();
+        }
+        await getRoomState();
+      } catch (error) {
+        console.error("Failed to connect or get room state:", error);
         navigate("/");
-      });
-    }
-  }, [roomId, userName, isConnected, navigate, getRoomState]);
+      }
+    };
+
+    connectAndGetState();
+  }, [roomId, userName, isConnected, navigate, getRoomState, initializeConnection]);
 
   const handleCardSelect = (value: string) => {
     if (currentRoom?.votesRevealed) return;
-    
+
     const newValue = selectedCard === value ? null : value;
     setSelectedCard(newValue);
     vote(newValue);
@@ -45,7 +53,7 @@ const Room = () => {
     resetVotes();
   };
 
-  const allUsersVoted = currentRoom?.participants.every(p => p.hasVoted) ?? false;
+  const allUsersVoted = currentRoom?.participants.every((p) => p.hasVoted) ?? false;
 
   if (!currentRoom || !userName) {
     return (
@@ -63,7 +71,9 @@ const Room = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Planning Poker</h1>
-              <p className="text-gray-600">Room: <span className="font-mono font-semibold">{roomId}</span></p>
+              <p className="text-gray-600">
+                Room: <span className="font-mono font-semibold">{roomId}</span>
+              </p>
             </div>
             <button
               onClick={() => navigate("/")}
@@ -133,7 +143,7 @@ const Room = () => {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Results</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {currentRoom.participants
-                .filter(p => p.vote)
+                .filter((p) => p.vote)
                 .sort((a, b) => {
                   const aNum = parseInt(a.vote || "0");
                   const bNum = parseInt(b.vote || "0");
@@ -142,9 +152,7 @@ const Room = () => {
                 })
                 .map((participant) => (
                   <div key={participant.id} className="text-center">
-                    <div className="text-3xl font-bold text-blue-600 mb-1">
-                      {participant.vote}
-                    </div>
+                    <div className="text-3xl font-bold text-blue-600 mb-1">{participant.vote}</div>
                     <div className="text-sm text-gray-600">{participant.name}</div>
                   </div>
                 ))}
