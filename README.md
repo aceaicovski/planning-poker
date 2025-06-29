@@ -6,8 +6,9 @@ A real-time collaborative Planning Poker application built with React, TypeScrip
 
 ### Prerequisites
 
-- Node.js (version 18 or higher)
+- Node.js (version 22.0.0 - managed via nvm)
 - npm or yarn package manager
+- nvm (Node Version Manager) - recommended
 
 ### Installation
 
@@ -17,12 +18,24 @@ A real-time collaborative Planning Poker application built with React, TypeScrip
    cd planning-poker
    ```
 
-2. **Install dependencies**
+2. **Use the correct Node.js version (recommended)**
+   ```bash
+   nvm use
+   ```
+   This will automatically use Node.js v22.0.0 as specified in `.nvmrc`
+
+   If you don't have Node.js v22.0.0 installed:
+   ```bash
+   nvm install 22.0.0
+   nvm use 22.0.0
+   ```
+
+3. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. **Start the application**
+4. **Start the application**
    ```bash
    npm run dev
    ```
