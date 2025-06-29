@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "@/hooks/useSocket";
 import { useStoreState } from "@/store/hooks/useStoreState";
@@ -10,11 +10,24 @@ const Room = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
 
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const hasInitializedRef = useRef(false);
 
-  const { vote, revealVotes, resetVotes, getRoomState, initializeConnection, reconnectWithExistingUser, disconnect } = useSocket();
+  const {
+    vote,
+    revealVotes,
+    resetVotes,
+    getRoomState,
+    initializeConnection,
+    reconnectWithExistingUser,
+    leaveRoom,
+    disconnect,
+  } = useSocket();
   const { currentRoom, userId, userName, isConnected } = useStoreState((state) => state.poker);
+
+  // Get current participant data from server state
+  const currentParticipant = useMemo(() => {
+    return currentRoom?.participants?.find((p: Participant) => p.id === userId) || null;
+  }, [currentRoom?.participants, userId]);
 
   useEffect(() => {
     // If no room ID from URL, redirect to lobby
@@ -32,7 +45,7 @@ const Room = () => {
     // Initialize connection and get room state only once
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
-      
+
       const connectAndGetState = async () => {
         try {
           // If we have user info and room ID, try to reconnect
@@ -41,7 +54,10 @@ const Room = () => {
             try {
               await reconnectWithExistingUser(userId, roomId, userName);
             } catch (error) {
-              console.log("Reconnection failed, user was likely removed from room. Redirecting to lobby.", error);
+              console.log(
+                "Reconnection failed, user was likely removed from room. Redirecting to lobby.",
+                error
+              );
               // Clear session storage and redirect to lobby
               disconnect();
               navigate("/");
@@ -64,15 +80,12 @@ const Room = () => {
 
       connectAndGetState();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once when component mounts
 
   const handleCardSelect = (value: string) => {
-    if (currentRoom?.votesRevealed) return;
+    if (currentRoom?.votesRevealed || currentParticipant?.hasVoted) return;
 
-    const newValue = selectedCard === value ? null : value;
-    setSelectedCard(newValue);
-    vote(newValue);
+    vote(value);
   };
 
   const handleRevealVotes = () => {
@@ -80,8 +93,17 @@ const Room = () => {
   };
 
   const handleResetVotes = () => {
-    setSelectedCard(null);
     resetVotes();
+  };
+
+  const handleLeaveRoom = async () => {
+    try {
+      await leaveRoom();
+      navigate("/");
+    } catch {
+      // Navigate anyway in case of error
+      navigate("/");
+    }
   };
 
   const allUsersVoted = currentRoom?.participants.every((p: Participant) => p.hasVoted) ?? false;
@@ -98,7 +120,7 @@ const Room = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-xl shadow-lg px-6 py-4 mb-6">
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Planning Poker</h1>
@@ -108,10 +130,9 @@ const Room = () => {
             </div>
             <button
               onClick={() => {
-                disconnect();
-                navigate("/");
+                handleLeaveRoom();
               }}
-              className="text-gray-500 hover:text-gray-700 transition"
+              className="px-6 py-3 rounded-lg font-medium border-2 border-blue-500 text-blue-500 hover:bg-blue-50 transition cursor-pointer"
             >
               Leave Room
             </button>
@@ -122,7 +143,7 @@ const Room = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Participants</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {currentRoom.participants.map((participant: Participant) => (
+            {currentRoom.participants?.map((participant: Participant) => (
               <div
                 key={participant.id}
                 className={`p-4 rounded-lg border-2 ${
@@ -158,10 +179,15 @@ const Room = () => {
                 <button
                   key={value}
                   onClick={() => handleCardSelect(value)}
-                  className={`aspect-[3/4] rounded-lg border-2 font-bold text-xl transition-all hover:scale-105 ${
-                    selectedCard === value
-                      ? "border-blue-500 bg-blue-500 text-white shadow-lg"
-                      : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                  disabled={currentParticipant?.hasVoted}
+                  className={`aspect-[3/4] rounded-lg border-2 font-bold text-xl transition-all ${
+                    currentParticipant?.hasVoted
+                      ? currentParticipant?.vote === value
+                        ? "border-blue-500 bg-blue-500 text-white shadow-lg cursor-not-allowed"
+                        : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : currentParticipant?.vote === value
+                        ? "border-blue-500 bg-blue-500 text-white shadow-lg hover:scale-105 cursor-pointer"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-blue-300 hover:scale-105 cursor-pointer"
                   }`}
                 >
                   {value}
@@ -203,7 +229,7 @@ const Room = () => {
                 disabled={!allUsersVoted}
                 className={`px-6 py-3 rounded-lg font-medium transition ${
                   allUsersVoted
-                    ? "bg-green-600 text-white hover:bg-green-700"
+                    ? "bg-green-600 text-white hover:bg-green-700 cursor-pointer"
                     : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
@@ -213,7 +239,7 @@ const Room = () => {
             {currentRoom.votesRevealed && (
               <button
                 onClick={handleResetVotes}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition cursor-pointer"
               >
                 Start New Round
               </button>

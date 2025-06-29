@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "@/hooks/useSocket";
 import { useStoreState } from "@/store/hooks/useStoreState";
@@ -94,7 +94,7 @@ const Lobby = () => {
               type="text"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              onKeyPress={(e) => handleKeyPress(e, "create")}
+              onKeyDown={(e) => handleKeyPress(e, "create")}
               placeholder="Enter your name"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
               disabled={isLoading}
@@ -107,7 +107,7 @@ const Lobby = () => {
             <button
               onClick={handleCreateRoom}
               disabled={!nameInput.trim() || isLoading}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition font-medium"
             >
               {isLoading ? "Creating Room..." : "Create New Room"}
             </button>
@@ -142,7 +142,7 @@ const Lobby = () => {
             <button
               onClick={handleJoinRoom}
               disabled={!nameInput.trim() || !roomIdInput.trim() || isLoading}
-              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+              className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition font-medium"
             >
               {isLoading ? "Joining Room..." : "Join Room"}
             </button>

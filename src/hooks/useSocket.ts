@@ -31,19 +31,15 @@ export const useSocket = () => {
       socketRef.current = globalSocket;
 
       globalSocket.onopen = () => {
-        console.log("Connected to WebSocket server");
         setConnectionStatus(true);
         
         // If we have existing user info, try to reconnect
         if (existingUserId && roomId && userName) {
-          console.log("Attempting to reconnect with existing user data");
           sendMessage("reconnect", { userId: existingUserId, roomId, userName }, true)
             .then(() => {
-              console.log("Reconnection successful");
               resolve();
             })
-            .catch((error) => {
-              console.log("Reconnection failed, continuing as new connection:", error);
+            .catch(() => {
               resolve();
             });
         } else {
@@ -52,12 +48,10 @@ export const useSocket = () => {
       };
 
       globalSocket.onclose = () => {
-        console.log("Disconnected from WebSocket server");
         setConnectionStatus(false);
       };
 
       globalSocket.onerror = (error) => {
-        console.error("WebSocket error:", error);
         setConnectionStatus(false);
         reject(error);
       };
@@ -88,8 +82,8 @@ export const useSocket = () => {
               updateRoom(payload as Room);
               break;
           }
-        } catch (error) {
-          console.error("Error processing WebSocket message:", error);
+        } catch {
+          // Ignore parsing errors
         }
       };
     });
@@ -230,12 +224,20 @@ export const useSocket = () => {
       setRoom(response.room);
       return response.room;
     } catch (error) {
-      console.error("Failed to reconnect:", error);
       // Clear any session data if reconnection fails completely
       reset();
       throw error;
     }
   }, [initializeConnection, sendMessage, setRoom, reset]);
+
+  const leaveRoom = useCallback(() => {
+    // Clear local state and disconnect
+    reset();
+    if (globalSocket) {
+      globalSocket.close();
+      globalSocket = null;
+    }
+  }, [reset]);
 
   const disconnect = useCallback(() => {
     if (globalSocket) {
@@ -255,6 +257,7 @@ export const useSocket = () => {
     revealVotes,
     resetVotes,
     getRoomState,
+    leaveRoom,
     disconnect,
   };
 };
