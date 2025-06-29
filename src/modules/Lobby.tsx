@@ -8,7 +8,7 @@ const Lobby = () => {
   const [roomIdInput, setRoomIdInput] = useState("");
 
   const { createRoom, joinRoom } = useSocket();
-  const { isLoading, error } = useStoreState((state) => state.poker);
+  const { isLoading, error, userName, currentRoom } = useStoreState((state) => state.poker);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -16,6 +16,20 @@ const Lobby = () => {
       alert(error);
     }
   }, [error]);
+
+  // Auto-redirect if we have an active room
+  useEffect(() => {
+    if (currentRoom?.id && userName) {
+      navigate(`/room/${currentRoom.id}`);
+    }
+  }, [currentRoom, userName, navigate]);
+
+  // Pre-fill name input if user has a session
+  useEffect(() => {
+    if (userName && !nameInput) {
+      setNameInput(userName);
+    }
+  }, [userName]);
 
   const handleCreateRoom = async () => {
     if (!nameInput.trim()) {

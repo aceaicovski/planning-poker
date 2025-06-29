@@ -119,8 +119,7 @@ function sendMessage(ws, message) {
 }
 
 wss.on('connection', (ws) => {
-  const userId = uuidv4();
-  console.log('New client connected:', userId);
+  let userId = null;
   
   ws.on('message', (data) => {
     try {
@@ -128,10 +127,63 @@ wss.on('connection', (ws) => {
       const { type, payload, id } = message;
       
       switch (type) {
+        case 'reconnect': {
+          const { userId: existingUserId, roomId, userName } = payload;
+          userId = existingUserId;
+          console.log('Client reconnecting:', { userId, roomId, userName });
+          
+          const room = getRoom(roomId);
+          if (room) {
+            // If participant doesn't exist, add them back (they may have been removed due to timeout)
+            if (!room.participants.has(userId)) {
+              addParticipant(roomId, userId, userName);
+              console.log('Re-added participant to room after timeout:', { userId, roomId, userName });
+            }
+            
+            // Update client info
+            clients.set(userId, {
+              ws,
+              roomId,
+              userName
+            });
+            
+            sendMessage(ws, {
+              type: 'reconnect-response',
+              id,
+              payload: {
+                success: true,
+                roomId,
+                userId
+              }
+            });
+            
+            // Broadcast room update to all participants (including the reconnected user)
+            broadcastToRoom(roomId, {
+              type: 'room-updated',
+              payload: getRoomState(roomId)
+            });
+          } else {
+            // Room doesn't exist - it may have been deleted when all users left
+            console.log('Room not found for reconnection:', { userId, roomId });
+            sendMessage(ws, {
+              type: 'reconnect-response',
+              id,
+              payload: {
+                success: false,
+                error: 'Session not found'
+              }
+            });
+          }
+          break;
+        }
+        
         case 'create-room': {
           const { userName } = payload;
+          if (!userId) {
+            userId = uuidv4();
+          }
           const room = createRoom();
-          console.log('Room created:', { roomId: room.id, userName });
+          console.log('Room created:', { roomId: room.id, userName, userId });
           
           addParticipant(room.id, userId, userName);
           
@@ -162,8 +214,11 @@ wss.on('connection', (ws) => {
         
         case 'join-room': {
           const { roomId, userName } = payload;
+          if (!userId) {
+            userId = uuidv4();
+          }
           const normalizedRoomId = roomId.toUpperCase();
-          console.log('Join room request:', { roomId: normalizedRoomId, userName });
+          console.log('Join room request:', { roomId: normalizedRoomId, userName, userId });
           
           const room = getRoom(normalizedRoomId);
           
@@ -290,18 +345,28 @@ wss.on('connection', (ws) => {
   });
   
   ws.on('close', () => {
+    if (!userId) return;
+    
     console.log('Client disconnected:', userId);
     const clientData = clients.get(userId);
     
-    if (clientData && clientData.roomId) {
-      removeParticipant(clientData.roomId, userId);
-      broadcastToRoom(clientData.roomId, {
-        type: 'room-updated',
-        payload: getRoomState(clientData.roomId)
-      });
-    }
-    
-    clients.delete(userId);
+    // Don't immediately remove participant - give them 10 seconds to reconnect
+    setTimeout(() => {
+      // Check if user has reconnected during the delay
+      const currentClientData = clients.get(userId);
+      if (!currentClientData || currentClientData.ws === ws) {
+        // User hasn't reconnected, remove them
+        if (clientData && clientData.roomId) {
+          console.log('Removing participant after timeout:', userId);
+          removeParticipant(clientData.roomId, userId);
+          broadcastToRoom(clientData.roomId, {
+            type: 'room-updated',
+            payload: getRoomState(clientData.roomId)
+          });
+        }
+        clients.delete(userId);
+      }
+    }, 10000); // 10 second grace period
   });
   
   ws.on('error', (error) => {

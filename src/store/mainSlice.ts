@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { loadState, clearState } from "@/lib/sessionStorage";
 
 export interface Participant {
   id: string;
@@ -13,7 +14,7 @@ export interface Room {
   votesRevealed: boolean;
 }
 
-interface PokerState {
+export interface PokerState {
   userId: string;
   userName: string;
   currentRoom: Room | null;
@@ -22,13 +23,19 @@ interface PokerState {
   error: string | null;
 }
 
-const initialState: PokerState = {
+// Load persisted state on initialization
+const defaultState: PokerState = {
   userId: "",
   userName: "",
   currentRoom: null,
   isConnected: false,
   isLoading: false,
   error: null,
+};
+
+const initialState: PokerState = {
+  ...defaultState,
+  ...loadState()
 };
 
 const mainSlice = createSlice({
@@ -65,6 +72,9 @@ const mainSlice = createSlice({
       state.currentRoom = null;
       state.isLoading = false;
       state.error = null;
+      
+      // Clear persisted state
+      clearState();
     },
   },
 });

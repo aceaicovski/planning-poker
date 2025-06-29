@@ -16,7 +16,7 @@ export const useSocket = () => {
     useStoreActions();
   const socketRef = useRef<WebSocket | null>(null);
 
-  const initializeConnection = useCallback(() => {
+  const initializeConnection = useCallback((existingUserId?: string, roomId?: string, userName?: string) => {
     if (globalSocket && globalSocket.readyState === WebSocket.OPEN) {
       socketRef.current = globalSocket;
       return Promise.resolve();
@@ -33,7 +33,22 @@ export const useSocket = () => {
       globalSocket.onopen = () => {
         console.log("Connected to WebSocket server");
         setConnectionStatus(true);
-        resolve();
+        
+        // If we have existing user info, try to reconnect
+        if (existingUserId && roomId && userName) {
+          console.log("Attempting to reconnect with existing user data");
+          sendMessage("reconnect", { userId: existingUserId, roomId, userName }, true)
+            .then(() => {
+              console.log("Reconnection successful");
+              resolve();
+            })
+            .catch((error) => {
+              console.log("Reconnection failed, continuing as new connection:", error);
+              resolve();
+            });
+        } else {
+          resolve();
+        }
       };
 
       globalSocket.onclose = () => {
@@ -195,6 +210,7 @@ export const useSocket = () => {
     return sendMessage("reset-votes", {});
   }, [sendMessage]);
 
+
   const getRoomState = useCallback(async () => {
     // Only get room state if already connected
     if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
@@ -205,6 +221,21 @@ export const useSocket = () => {
     setRoom(response.room);
     return response.room;
   }, [setRoom, sendMessage]);
+
+  const reconnectWithExistingUser = useCallback(async (userId: string, roomId: string, userName: string) => {
+    try {
+      await initializeConnection(userId, roomId, userName);
+      // After reconnection, get the current room state
+      const response = await sendMessage<{ success: boolean; room: Room }>("get-room-state", {}, true);
+      setRoom(response.room);
+      return response.room;
+    } catch (error) {
+      console.error("Failed to reconnect:", error);
+      // Clear any session data if reconnection fails completely
+      reset();
+      throw error;
+    }
+  }, [initializeConnection, sendMessage, setRoom, reset]);
 
   const disconnect = useCallback(() => {
     if (globalSocket) {
@@ -217,6 +248,7 @@ export const useSocket = () => {
   return {
     socket: socketRef.current,
     initializeConnection,
+    reconnectWithExistingUser,
     createRoom,
     joinRoom,
     vote,

@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "@/hooks/useSocket";
 import { useStoreState } from "@/store/hooks/useStoreState";
+import type { Participant } from "@/store/mainSlice";
 
 const CARD_VALUES = ["1", "2", "3", "5", "8", "13", "?", "☕"];
 
@@ -10,31 +11,61 @@ const Room = () => {
   const navigate = useNavigate();
 
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const hasInitializedRef = useRef(false);
 
-  const { vote, revealVotes, resetVotes, getRoomState, initializeConnection } = useSocket();
+  const { vote, revealVotes, resetVotes, getRoomState, initializeConnection, reconnectWithExistingUser, disconnect } = useSocket();
   const { currentRoom, userId, userName, isConnected } = useStoreState((state) => state.poker);
 
   useEffect(() => {
-    if (!roomId || !userName) {
+    // If no room ID from URL, redirect to lobby
+    if (!roomId) {
       navigate("/");
       return;
     }
 
-    // If user navigated directly to room URL, we need to connect first
-    const connectAndGetState = async () => {
-      try {
-        if (!isConnected) {
-          await initializeConnection();
-        }
-        await getRoomState();
-      } catch (error) {
-        console.error("Failed to connect or get room state:", error);
-        navigate("/");
-      }
-    };
+    // If user has no session info, redirect to lobby
+    if (!userName || !userId) {
+      navigate("/");
+      return;
+    }
 
-    connectAndGetState();
-  }, [roomId, userName, isConnected, navigate, getRoomState, initializeConnection]);
+    // Initialize connection and get room state only once
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      
+      const connectAndGetState = async () => {
+        try {
+          // If we have user info and room ID, try to reconnect
+          if (userId && userName && roomId) {
+            console.log("Attempting to reconnect existing user to room");
+            try {
+              await reconnectWithExistingUser(userId, roomId, userName);
+            } catch (error) {
+              console.log("Reconnection failed, user was likely removed from room. Redirecting to lobby.", error);
+              // Clear session storage and redirect to lobby
+              disconnect();
+              navigate("/");
+              return;
+            }
+          } else {
+            // New connection
+            if (!isConnected) {
+              await initializeConnection();
+            }
+            await getRoomState();
+          }
+        } catch (error) {
+          console.error("Failed to connect or get room state:", error);
+          // Clear session and redirect to lobby on any connection failure
+          disconnect();
+          navigate("/");
+        }
+      };
+
+      connectAndGetState();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once when component mounts
 
   const handleCardSelect = (value: string) => {
     if (currentRoom?.votesRevealed) return;
@@ -53,7 +84,7 @@ const Room = () => {
     resetVotes();
   };
 
-  const allUsersVoted = currentRoom?.participants.every((p) => p.hasVoted) ?? false;
+  const allUsersVoted = currentRoom?.participants.every((p: Participant) => p.hasVoted) ?? false;
 
   if (!currentRoom || !userName) {
     return (
@@ -76,7 +107,10 @@ const Room = () => {
               </p>
             </div>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => {
+                disconnect();
+                navigate("/");
+              }}
               className="text-gray-500 hover:text-gray-700 transition"
             >
               Leave Room
@@ -88,7 +122,7 @@ const Room = () => {
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Participants</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {currentRoom.participants.map((participant) => (
+            {currentRoom.participants.map((participant: Participant) => (
               <div
                 key={participant.id}
                 className={`p-4 rounded-lg border-2 ${
@@ -143,14 +177,14 @@ const Room = () => {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Results</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {currentRoom.participants
-                .filter((p) => p.vote)
-                .sort((a, b) => {
+                .filter((p: Participant) => p.vote)
+                .sort((a: Participant, b: Participant) => {
                   const aNum = parseInt(a.vote || "0");
                   const bNum = parseInt(b.vote || "0");
                   if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
                   return 0;
                 })
-                .map((participant) => (
+                .map((participant: Participant) => (
                   <div key={participant.id} className="text-center">
                     <div className="text-3xl font-bold text-blue-600 mb-1">{participant.vote}</div>
                     <div className="text-sm text-gray-600">{participant.name}</div>
