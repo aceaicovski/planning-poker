@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { v4 as uuidv4 } from "uuid";
-import { useStoreActions } from "@/store/hooks/useStoreActions.ts";
+import { useSocket } from "@/hooks/useSocket";
+import { useStoreState } from "@/store/hooks/useStoreState";
 
 const Lobby = () => {
   const [nameInput, setNameInput] = useState("");
   const [roomIdInput, setRoomIdInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  const { setName, setRoomId } = useStoreActions();
+  const { createRoom, joinRoom } = useSocket();
+  const { isLoading, error } = useStoreState((state) => state.poker);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (error) {
+      alert(error);
+    }
+  }, [error]);
 
   const handleCreateRoom = async () => {
     if (!nameInput.trim()) {
@@ -17,22 +23,11 @@ const Lobby = () => {
       return;
     }
 
-    setIsLoading(true);
-
     try {
-      const newRoomId = uuidv4().substring(0, 8).toUpperCase(); // Short, readable room ID
-
-      // Update Redux state
-      setName(nameInput.trim());
-      setRoomId(newRoomId);
-
-      // Navigate to room with URL params
-      navigate(`/room/${newRoomId}?name=${encodeURIComponent(nameInput.trim())}`);
+      const { roomId } = await createRoom(nameInput.trim());
+      navigate(`/room/${roomId}`);
     } catch (error) {
       console.error("Failed to create room:", error);
-      alert("Failed to create room. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -47,22 +42,12 @@ const Lobby = () => {
       return;
     }
 
-    setIsLoading(true);
-
     try {
       const roomId = roomIdInput.trim().toUpperCase();
-
-      // Update Redux state
-      setName(nameInput.trim());
-      setRoomId(roomId);
-
-      // Navigate to room with URL params
-      navigate(`/room/${roomId}?name=${encodeURIComponent(nameInput.trim())}`);
+      await joinRoom(roomId, nameInput.trim());
+      navigate(`/room/${roomId}`);
     } catch (error) {
       console.error("Failed to join room:", error);
-      alert("Failed to join room. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -133,7 +118,7 @@ const Lobby = () => {
               id="roomId"
               type="text"
               value={roomIdInput}
-              onChange={(e) => setRoomIdInput(e.target.value.toUpperCase())}
+              onChange={(e) => setRoomIdInput(e.target.value)}
               onKeyDown={(e) => handleKeyPress(e, "join")}
               placeholder="Enter Room ID"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"

@@ -1,5 +1,5 @@
 import { useDispatch } from "react-redux";
-import type { AppDispatch } from "../index";
+import type { AppDispatch } from "@/store";
 import { mainSliceActions } from "../mainSlice";
 import { bindActionCreators } from "@reduxjs/toolkit";
 
